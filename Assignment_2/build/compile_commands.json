@@ -1,0 +1,7 @@
+[
+{
+  "directory": "C:/Data/CSC 305/CG-Spring-2022/Assignment_2/build",
+  "command": "C:\\msys64\\mingw64\\bin\\x86_64-w64-mingw32-g++.exe  @CMakeFiles/assignment2.dir/includes_CXX.rsp -g -std=gnu++11 -o CMakeFiles\\assignment2.dir\\src\\main.cpp.obj -c \"C:\\Data\\CSC 305\\CG-Spring-2022\\Assignment_2\\src\\main.cpp\"",
+  "file": "C:/Data/CSC 305/CG-Spring-2022/Assignment_2/src/main.cpp"
+}
+]

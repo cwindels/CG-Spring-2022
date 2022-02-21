@@ -1,0 +1,3 @@
+C:/Data/CSC 305/CG-Spring-2022/Assignment_2/build/CMakeFiles/assignment2.dir
+C:/Data/CSC 305/CG-Spring-2022/Assignment_2/build/CMakeFiles/edit_cache.dir
+C:/Data/CSC 305/CG-Spring-2022/Assignment_2/build/CMakeFiles/rebuild_cache.dir
