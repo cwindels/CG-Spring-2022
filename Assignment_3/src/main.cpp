@@ -25,7 +25,7 @@ const std::string filename("raytrace.png");
 const double focal_length = 10;
 const double field_of_view = 0.7854; //45 degrees
 const double image_z = 5;
-const bool is_perspective = false;
+const bool is_perspective = true;
 const Vector3d camera_position(0, 0, 5);
 
 //Maximum number of recursive calls
@@ -193,52 +193,69 @@ Vector4d procedural_texture(const double tu, const double tv)
 //Compute the intersection between a ray and a sphere, return -1 if no intersection
 double ray_sphere_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, int index, Vector3d &p, Vector3d &N)
 {
-    // TODO, implement the intersection between the ray and the sphere at index index.
-    //return t or -1 if no intersection
-
     const Vector3d sphere_center = sphere_centers[index];
     const double sphere_radius = sphere_radii[index];
 
     double t = -1;
 
-    if (false)
-    {
-        return -1;
-    }
-    else
-    {
-        //TODO set the correct intersection point, update p to the correct value
-        p = ray_origin;
-        N = ray_direction;
+    double AA = ray_direction.dot(ray_direction);
+    double BB = 2 * ray_direction.dot(ray_origin - sphere_center);
+    double CC = (ray_origin - sphere_center).dot(ray_origin - sphere_center) - (sphere_radius * sphere_radius);
 
-        return t;
+    double delta = (BB * BB) - (4 * AA * CC);
+
+    if(delta >= 0) {
+        double t1 = (-BB + sqrt(delta)) / (2 * AA);
+        double t2 = (-BB - sqrt(delta)) / (2 * AA);
+
+        double tmpt = std::min(t1,t2); // Find closest to camera
+        if(tmpt < 0)
+            tmpt = std::max(t1,t2);
+        if(tmpt >= 0)
+            t = tmpt;
+            p = ray_origin + t * ray_direction;
+            N = (p - sphere_center).normalized();
     }
 
-    return -1;
+    return t;
+}
+
+Vector3d ray_pgram_parameters(Vector3d u, Vector3d v, Vector3d d, Vector3d ray_o, Vector3d p_o)
+{
+    Matrix3d A;
+    A << u, v, -d;
+
+    Vector3d k = ray_o + (-1)*p_o;
+    Vector3d uvt = A.partialPivLu().solve(k);
+
+    return uvt;
 }
 
 //Compute the intersection between a ray and a paralleogram, return -1 if no intersection
 double ray_parallelogram_intersection(const Vector3d &ray_origin, const Vector3d &ray_direction, int index, Vector3d &p, Vector3d &N)
 {
-    // TODO, implement the intersection between the ray and the parallelogram at index index.
-    //return t or -1 if no intersection
-
     const Vector3d pgram_origin = parallelograms[index].col(0);
     const Vector3d A = parallelograms[index].col(1);
     const Vector3d B = parallelograms[index].col(2);
     const Vector3d pgram_u = A - pgram_origin;
     const Vector3d pgram_v = B - pgram_origin;
 
-    if (false)
-    {
-        return -1;
+    double t = -1;
+
+    Vector3d uvt = ray_pgram_parameters(pgram_u, pgram_v, ray_direction, ray_origin, pgram_origin);
+    if (0 <= uvt(0) && uvt(0) <= 1 && 0 <= uvt(1) && uvt(1) <= 1 && uvt(2) > 0) {
+        // The ray hit the parallelogram, compute the exact intersection point
+        Vector3d ray_intersection= ray_origin + uvt(2)*ray_direction;
+
+        // Compute normal at the intersection point
+        Vector3d ray_normal = pgram_u.cross(pgram_v);
+
+        p = ray_intersection;
+        N = -1 * ray_normal.normalized();
+        t = uvt(2);
     }
 
-    //TODO set the correct intersection point, update p and N to the correct values
-    p = ray_origin;
-    N = p.normalized();
-
-    return -1;
+    return t;
 }
 
 //Finds the closest intersecting object returns its index
@@ -299,7 +316,15 @@ bool is_light_visible(const Vector3d &ray_origin, const Vector3d &ray_direction,
 {
     // TODO: Determine if the light is visible here
     // Use find_nearest_object
-    return true;
+    bool visible = true;
+    
+    Vector3d p, N;
+
+    int i = find_nearest_object(ray_origin, ray_direction, p, N);
+    if(i >= 0) //&& (ray_origin - p).norm() < (ray_origin - light_position).norm()) // ray hit an object, light is not visible from p
+        visible = false;
+
+    return visible;
 }
 
 Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, int max_bounce)
@@ -326,8 +351,15 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
         const Vector4d &light_color = light_colors[i];
 
         const Vector3d Li = (light_position - p).normalized();
+        const Vector3d Vi = (camera_position - p).normalized();
+        const Vector3d Hi = (Vi+Li).normalized();
 
         // TODO: Shoot a shadow ray to determine if the light should affect the intersection point and call is_light_visible
+
+        Vector3d epsilon = 0.0000001 * Li;
+        bool visible = is_light_visible(p + epsilon, Li, light_position);
+        if(!visible)
+            continue;
 
         Vector4d diff_color = obj_diffuse_color;
 
@@ -349,7 +381,7 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
         const Vector4d diffuse = diff_color * std::max(Li.dot(N), 0.0);
 
         // Specular contribution, use obj_specular_color
-        const Vector4d specular(0, 0, 0, 0);
+        const Vector4d specular= obj_specular_color * pow(std::max(Hi.dot(N), 0.0), obj_specular_exponent);
 
         // Attenuate lights according to the squared distance to the lights
         const Vector3d D = light_position - p;
@@ -363,7 +395,9 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
     }
     // TODO: Compute the color of the reflected ray and add its contribution to the current point color.
     // use refl_color
-    Vector4d reflection_color(0, 0, 0, 0);
+    // Vector3d r = ray_direction - 2 * (N.dot(ray_direction)) * N;
+    Vector3d r = 2 * N * (N.dot(ray_direction)) - ray_direction;
+    Vector4d reflection_color = refl_color.cwiseProduct(shoot_ray(p + 0.0001 * r, r, max_bounce--));
 
     // TODO: Compute the color of the refracted ray and add its contribution to the current point color.
     //       Make sure to check for total internal reflection before shooting a new ray.
@@ -395,8 +429,8 @@ void raytrace_scene()
     // The sensor grid is at a distance 'focal_length' from the camera center,
     // and covers an viewing angle given by 'field_of_view'.
     double aspect_ratio = double(w) / double(h);
-    double image_y = 1; //TODO: compute the correct pixels size
-    double image_x = 1; //TODO: compute the correct pixels size
+    double image_y = focal_length * tan(field_of_view/2);
+    double image_x = aspect_ratio * image_y;
 
     // The pixel grid through which we shoot rays is at a distance 'focal_length'
     const Vector3d image_origin(-image_x, image_y, -image_z);
@@ -416,7 +450,9 @@ void raytrace_scene()
 
             if (is_perspective)
             {
-                // TODO: Perspective camera
+                // Perspective camera
+                ray_origin = camera_position;
+                ray_direction = (pixel_center - camera_position).normalized();
             }
             else
             {
