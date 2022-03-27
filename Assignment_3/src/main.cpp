@@ -395,9 +395,8 @@ Vector4d shoot_ray(const Vector3d &ray_origin, const Vector3d &ray_direction, in
     }
     // TODO: Compute the color of the reflected ray and add its contribution to the current point color.
     // use refl_color
-    //std::cout << "printstatement" << std::endl;
-    Vector3d r = ray_direction - (N.dot(ray_direction)) * 2 * N;//ray_direction - 2 * (N.dot(ray_direction)) * N;
-    //Vector3d r = 2 * N * (N.dot(ray_direction)) - ray_direction;
+    // Vector3d r = ray_direction - 2 * (N.dot(ray_direction)) * N;
+    Vector3d r = 2 * N * (N.dot(ray_direction)) - ray_direction;
     Vector4d reflection_color = refl_color.cwiseProduct(shoot_ray(p + 0.0001 * r, r, max_bounce--));
 
     // TODO: Compute the color of the refracted ray and add its contribution to the current point color.
